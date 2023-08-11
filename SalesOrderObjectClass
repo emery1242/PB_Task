@@ -1,0 +1,96 @@
+public class SalesOrderObject {
+     public static void createSalesOrderObj(){
+        MetadataService.MetadataPort metadataservice = new MetadataService.MetadataPort();  
+        metadataservice.SessionHeader = new MetadataService.SessionHeader_element();
+        metadataservice.SessionHeader.sessionId = UserInfo.getSessionId();
+        List<MetadataService.Metadata> fields = new List<MetadataService.Metadata>();
+        MetadataService.CustomObject customobject = new MetadataService.CustomObject();
+        customobject.fullName = 'Sales_Order__c';
+        customobject.label = 'Sales Order';
+        customobject.pluralLabel = 'Sales Orders';
+        customObject.nameField = new MetadataService.CustomField();
+        customobject.nameField.type_x = 'Text';
+        customobject.nameField.label = 'Order';
+        customobject.deploymentStatus = 'Deployed';
+        customObject.sharingModel = 'ReadWrite';
+        fields.add(customobject); 
+        
+        MetadataService.CustomField lookupField = new MetadataService.CustomField();
+       
+        lookupField.fullName = 'Sales_Order__c.Opportunity__c';
+        lookupField.label = 'Opportunity';
+        lookupField.type_x = 'Lookup';
+        //lookupField.typeSpecified = true;
+        lookupField.relationshipName = 'Opportunity Lookup';
+        lookupField.relationshipLabel = 'Opportunity Lookup';
+        lookupField.referenceTo = 'Opportunity';
+    
+        fields.add(lookupField);
+                         
+        fields.add(setFieldData('Sales_Order__c.Sales_Order_Number__c', 'Sales Order Number', 'Text', 10)); 
+        fields.add(setFieldData('Sales_Order__c.Date__c', 'Date', 'Date', 0)); 
+        fields.add(setFieldData('Sales_Order__c.Account_Name__c', 'Account Name', 'Text', 50)); 
+        fields.add(setFieldData('Sales_Order__c.Contact_Name__c', 'Contact Name', 'Text', 50)); 
+        fields.add(setFieldData('Sales_Order__c.Opportunity_Name__c', 'Opportunity Name', 'Text', 100)); 
+        fields.add(setFieldDataForCurrencyField('Sales_Order__c.Sales_Order_Amount__c', 'Sales Order Amount', 'Currency', 18, 0)); 
+        try{
+			metadataservice.createMetadata(fields);   
+        }catch(DmlException e) {
+    		System.debug('The following exception has occurred: ' + e.getMessage());
+		}
+         system.debug(fields);
+        
+    }
+    
+    
+    
+    public static MetadataService.CustomField setFieldData(string fName, string label, string fType, integer fLength){
+        MetadataService.CustomField fieldMeta = new MetadataService.CustomField();
+        fieldMeta.fullName = fName;
+        fieldMeta.label = label;
+        fieldMeta.type_x = fType;
+        if(fLength!=0){
+           fieldMeta.length = fLength; 
+        }
+                
+        return fieldMeta;
+    }
+    
+    
+    public static MetadataService.CustomField setFieldDataForCurrencyField(string fName, string label, string fCurrency, integer fprecision, integer fscale){
+        MetadataService.CustomField fieldMeta = new MetadataService.CustomField();
+        fieldMeta.fullName = fName;
+        fieldMeta.label = label;
+        fieldMeta.type_x = fCurrency;
+        fieldMeta.scale = fscale;
+        if(fprecision!=0){
+           fieldMeta.precision = fprecision; 
+        }
+        return fieldMeta;
+    }
+    
+    public static void createSalesOrderRecord() {
+        List<Sales_Order__c> soList = new List<Sales_Order__c>();
+        
+        for(Opportunity opp : [SELECT Id, Name, StageName, Amount, AccountId, ContactId, Account.Name FROM Opportunity WHERE StageName = 'Closed Won']) {
+            List<Sales_Order__c> existingSOList = [SELECT Id FROM Sales_Order__c WHERE Opportunity__c = :opp.Id LIMIT 1];
+            if (existingSOList.isEmpty() || 1==1) {
+                Sales_Order__c createSO = new Sales_Order__c();
+                
+                createSO.Opportunity__c = opp.id;
+                createSO.Opportunity_Name__c = opp.Name;
+                createSO.Date__c = Date.today();
+                createSo.Sales_Order_Amount__c = opp.Amount;
+                createSo.Account_Name__c = opp.Account.Name;
+                
+                soList.add(createSO);
+            }
+        }
+        
+        try {
+            upsert soList;
+        } catch(Exception e) {
+            System.debug(e);
+        }
+    }
+}
